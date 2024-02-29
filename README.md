@@ -1,6 +1,6 @@
-# NavierStokes_Parallel
+# Mist: a parallel Navier Stokes solver for gas-liquid multiphase flows
 
-[![Build Status](https://github.com/markowkes/NavierStokes_Parallel.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/markowkes/NavierStokes_Parallel.jl/actions/workflows/CI.yml?query=branch%3Amain)
+[![Build Status](https://github.com/markowkes/Mist.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/markowkes/Mist.jl/actions/workflows/CI.yml?query=branch%3Amain)
 
 Run on 1 processor
 ```
