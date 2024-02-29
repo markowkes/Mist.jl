@@ -1,4 +1,4 @@
-# Mist: a parallel Navier Stokes solver for gas-liquid multiphase flows
+# Mist.jl: a parallel Navier Stokes solver for gas-liquid multiphase flows written in Julia
 
 [![Build Status](https://github.com/markowkes/Mist.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/markowkes/Mist.jl/actions/workflows/CI.yml?query=branch%3Amain)
 
