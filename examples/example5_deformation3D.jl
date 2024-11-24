@@ -2,7 +2,7 @@
 Example using VF 
 """
 
-using NavierStokes_Parallel
+using Mist
 
 # Define parameters 
 param = parameters(

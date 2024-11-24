@@ -2,7 +2,7 @@
 Example using inflow/outflow
 """
 
-using NavierStokes_Parallel
+using Mist
 
 # Define parameters 
 param = parameters(
@@ -15,10 +15,10 @@ param = parameters(
     tFinal=1.0,      # Simulation time
     
     # Discretization inputs
-    Nx=50,           # Number of grid cells
-    Ny=50,
+    Nx=10,           # Number of grid cells
+    Ny=10,
     Nz=1,
-    stepMax=100,   # Maximum number of timesteps
+    stepMax=15,   # Maximum number of timesteps
     CFL=0.01,         # Courant-Friedrichs-Lewy (CFL) condition for timestep
     out_period=1,     # Number of steps between when plots are updated
     tol = 1e-3,
@@ -30,7 +30,7 @@ param = parameters(
 
     # Periodicity
     xper = false,
-    yper = true,
+    yper = false,
     zper = true,
 )
 

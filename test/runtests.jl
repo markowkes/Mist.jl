@@ -1,8 +1,8 @@
-using NavierStokes_Parallel
+using Mist
 using Test
 using MPI
 
-NS = NavierStokes_Parallel
+NS = Mist
 
 function testValue(test,value,expected,tol)
     if maximum(abs.(value.-expected)) <= tol 
@@ -16,7 +16,7 @@ function testValue(test,value,expected,tol)
     end
 end
 
-@testset "NavierStokes_Parallel.jl" begin
+@testset "Mist.jl" begin
     
     # # Example 1 - serial
     # include("../examples/example1.jl")

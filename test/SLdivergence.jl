@@ -1,11 +1,11 @@
 
-using NavierStokes_Parallel
+using Mist
 using Printf
 using OffsetArrays
 using Plots
 using Measures
 
-NS = NavierStokes_Parallel
+NS = Mist
 
 function test_SLdivergence()
     # Setup test parameters
@@ -157,7 +157,7 @@ function test_SLdivergence()
             tets,ind = NS.cell2tets_withProject_uvwf(i,j,k,ufa,vfa,wfa,dts[n],mesh)
             vol1 = dx*dy*dz
             vol2a[n] = NS.tets_vol(tets)
-            diva[n] = (vol1-vol2a[n])/dts[n]/vol1
+            diva[n] = (vol1-vol2a[n])/dts[n]/vol1 #(0.5*(vol1+vol2a[n]))
             diva_fd[n] = ( (ufa[i+1,j,k] - ufa[i,j,k])/dx
                          + (vfa[i,j+1,k] - vfa[i,j,k])/dy
                          + (wfa[i,j,k+1] - wfa[i,j,k])/dz )
@@ -166,7 +166,7 @@ function test_SLdivergence()
             tets,ind = NS.cell2tets_withProject_uvwf(i,j,k,ufb,vfb,wfb,dts[n],mesh)
             vol1 = dx*dy*dz
             vol2b[n] = NS.tets_vol(tets)
-            divb[n] = (vol1-vol2b[n])/dts[n]/vol1
+            divb[n] = (vol1-vol2b[n])/dts[n]/vol1 #(0.5*(vol1+vol2b[n]))
             divb_fd[n] = ( (ufb[i+1,j,k] - ufb[i,j,k])/dx
                          + (vfb[i,j+1,k] - vfb[i,j,k])/dy
                          + (wfb[i,j,k+1] - wfb[i,j,k])/dz )
@@ -175,7 +175,7 @@ function test_SLdivergence()
             tets,ind = NS.cell2tets_withProject_uvwf(i,j,k,ufa.+ufb,vfa.+vfb,wfa.+wfb,dts[n],mesh)
             vol1 = dx*dy*dz
             vol2ab[n] = NS.tets_vol(tets)
-            divab[n] = (vol1-vol2ab[n])/dts[n]/vol1
+            divab[n] = (vol1-vol2ab[n])/dts[n]/vol1 #(0.5*(vol1+vol2ab[n]))
             divab_fd[n] = ( ( (ufa[i+1,j,k] + ufb[i+1,j,k]) - (ufa[i,j,k] + ufb[i,j,k]) )/dx
                           + ( (vfa[i,j+1,k] + vfb[i,j+1,k]) - (vfa[i,j,k] + vfb[i,j,k]) )/dy
                           + ( (wfa[i,j,k+1] + wfb[i,j,k+1]) - (wfa[i,j,k] + wfb[i,j,k]) )/dz )

@@ -2,7 +2,7 @@
 Example using VF 
 """
 
-using NavierStokes_Parallel
+using Mist
 
 # Define parameters 
 param = parameters(
@@ -25,8 +25,8 @@ param = parameters(
     tol = 1e-3,
 
     # Processors 
-    nprocx = 1,
-    nprocy = 1,
+    nprocx = 4,
+    nprocy = 2,
     nprocz = 1,
 
     # Periodicity

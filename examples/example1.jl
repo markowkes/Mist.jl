@@ -5,7 +5,10 @@ Run from terminal using >> mpiexecjl --project=. -np 1 julia examples/example1.j
 or REPL using julia> include("examples/example1.jl")
 """
 
-using NavierStokes_Parallel
+# import Pkg
+# Pkg.activate(".")
+
+using Mist
 
 # Define parameters 
 param = parameters(
@@ -18,17 +21,17 @@ param = parameters(
     tFinal=100.0,      # Simulation time
 
     # Discretization inputs
-    Nx=20,           # Number of grid cells
-    Ny=20,
-    Nz=10,
-    stepMax=200,   # Maximum number of timesteps
+    Nx=10,           # Number of grid cells
+    Ny=10,
+    Nz=1,
+    stepMax=2,   # Maximum number of timesteps
     CFL=0.1,         # Courant-Friedrichs-Lewy (CFL) condition for timestep
     std_out_period = 0.0,
     out_period=10,     # Number of steps between when plots are updated
     tol = 1e-3,
 
     # Processors 
-    nprocx = 1,
+    nprocx = 2,
     nprocy = 1,
     nprocz = 1,
 
@@ -38,8 +41,8 @@ param = parameters(
     zper = false,
 
     # Iteration method used in @loop macro
-    #iter_type = "standard",
-    iter_type = "floop",
+    iter_type = "standard",
+    #iter_type = "floop",
 )
 
 """

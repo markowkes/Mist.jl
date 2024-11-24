@@ -4,7 +4,7 @@ Example using 2 processors
 Run from terminal using >> mpiexecjl --project=. -np 2 julia examples/example2.jl
 """
 
-using NavierStokes_Parallel
+using Mist
 
 # Define parameters 
 param = parameters(
@@ -17,8 +17,8 @@ param = parameters(
     tFinal=100.0,      # Simulation time
     
     # Discretization inputs
-    Nx=50,           # Number of grid cells
-    Ny=50,
+    Nx=20,           # Number of grid cells
+    Ny=20,
     Nz=10,
     stepMax=20,   # Maximum number of timesteps
     CFL=0.1,         # Courant-Friedrichs-Lewy (CFL) condition for timestep
@@ -34,6 +34,8 @@ param = parameters(
     xper = false,
     yper = false,
     zper = false,
+
+    VTK_dir = "VTK_example2",
 )
 
 """

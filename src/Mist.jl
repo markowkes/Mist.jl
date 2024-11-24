@@ -1,4 +1,4 @@
-module NavierStokes_Parallel
+module Mist
 
 export run_solver, parameters, VFcircle, VFsphere, @unpack
 
