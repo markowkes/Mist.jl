@@ -2,8 +2,12 @@
         # Setup test parameters
         param = parameters(
             # Constants
-            mu=0.1,       # Dynamic viscosity
-            rho=1.0,           # Density
+            mu_liq=0.1,       # Dynamic viscosity
+            mu_gas=0.1,       # Dynamic viscosity
+            rho_liq=1.0,           # Density
+            rho_gas=1.0,           # Density
+            sigma = 0.0,
+            gravity = 0.0,
             Lx=3.0,            # Domain size
             Ly=1.0,
             Lz=1.0,
@@ -40,7 +44,7 @@
         dist = NS.computeDist(i,j,k,nx,ny,nz,VF,param,mesh)
 
         # Now compute VOF from PLIC to compare with specified value
-        VF_calc = NS.computePLIC2VF(i,j,k,nx,ny,nz,dist,mesh)
+        VF_calc = NS.computePLIC2VF(i,j,k,nx,ny,nz,dist,param,mesh)
         
         tol = 1e-12
         return VF_calc,VF,tol
