@@ -7,8 +7,12 @@ using Mist
 # Define parameters 
 param = parameters(
     # Constants
-    mu=0.0,            # Dynamic viscosity
-    rho=1.0,           # Density
+    mu_liq=0.0,            # Dynamic viscosity
+    mu_gas=0.0,            # Dynamic viscosity
+    rho_liq=1.0,           # Density
+    rho_gas=1.0,           # Density
+    sigma = 0.0,
+    gravity = 0.0,
     Lx=1.0,            # Domain size
     Ly=1.0,
     Lz=1/50,
@@ -25,8 +29,8 @@ param = parameters(
     tol = 1e-3,
 
     # Processors 
-    nprocx = 4,
-    nprocy = 2,
+    nprocx = 1,
+    nprocy = 1,
     nprocz = 1,
 
     # Periodicity
@@ -39,7 +43,7 @@ param = parameters(
     VFVelocity = "Deformation",
 
     # Iteration method used in @loop macro
-    #iter_type = "standard",
+    iter_type = "standard",
     #iter_type = "floop",
 )
 
@@ -77,10 +81,18 @@ end
 """
 Boundary conditions for velocity
 """
-function BC!(u,v,w,mesh,par_env)
+function BC!(u,v,w,t,mesh,par_env)
+    # Not needed when solveNS=false
+    return nothing
+end
+
+"""
+Outflow
+"""
+function outflow()
     # Not needed when solveNS=false
     return nothing
 end
 
 # Simply run solver on 1 processor
-run_solver(param, IC!, BC!)
+run_solver(param, IC!, BC!,outflow)

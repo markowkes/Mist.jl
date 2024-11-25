@@ -9,8 +9,12 @@ using Mist
 # Define parameters 
 param = parameters(
     # Constants
-    mu=0.1,       # Dynamic viscosity
-    rho=1.0,           # Density
+    mu_liq=0.1,       # Dynamic viscosity
+    mu_gas=0.1,       # Dynamic viscosity
+    rho_liq=1.0,           # Density
+    rho_gas=1.0,           # Density
+    sigma = 0.0,
+    gravity = 0.0,
     Lx=3.0,            # Domain size
     Ly=3.0,
     Lz=3.0,
@@ -63,7 +67,7 @@ end
 """
 Boundary conditions for velocity
 """
-function BC!(u,v,w,mesh,par_env)
+function BC!(u,v,w,t,mesh,par_env)
     @unpack irankx, iranky, irankz, nprocx, nprocy, nprocz = par_env
     @unpack imin,imax,jmin,jmax,kmin,kmax = mesh
     
@@ -115,5 +119,21 @@ function BC!(u,v,w,mesh,par_env)
     return nothing
 end
 
+
+"""
+Define area of outflow region
+"""
+function outflow_correction!(correction,uf,vf,wf,mesh,par_env)
+    # Do nothing - no inflow/outflow
+end
+
+"""
+Define area of outflow region
+"""
+function outflow_area(mesh,par_env)
+    # Do nothing - no inflow/outflow
+end
+outflow =(area=outflow_area,correction=outflow_correction!)
+
 # Simply run solver on 1 processor
-run_solver(param, IC!, BC!)
+run_solver(param, IC!, BC!,outflow)

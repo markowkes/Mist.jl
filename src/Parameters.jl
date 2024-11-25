@@ -2,8 +2,13 @@ using Parameters
 
 @with_kw struct parameters 
     # Material properties
-    mu  :: Float64
-    rho :: Float64
+
+    mu_liq  :: Float64
+    mu_gas :: Float64
+    rho_liq :: Float64
+    rho_gas :: Float64
+    sigma :: Float64
+    gravity :: Float64
 
     # Domain size
     Lx  :: Float64
@@ -39,11 +44,18 @@ using Parameters
     xper :: Bool
     yper :: Bool
     zper :: Bool
+
+    # Restart simulation
+    restart :: Bool = false
+    restart_itr :: Int64 = 0
+
     
     # Navier Stokes solver
     solveNS :: Bool = true 
-    pressureSolver :: String = "ConjugateGradient" 
+    # pressureSolver :: String = "ConjugateGradient"
+    pressureSolver :: String = "Secant" 
     tol :: Float64
+    pressure_scheme :: String = "semi-lagrangian"
 
     # Interface solver
     VFlo :: Float64 = 1e-10 
@@ -51,6 +63,7 @@ using Parameters
     normalMethod :: String = "ELVIRA" 
     # Velocity used for Vf transport when solveNS = false
     VFVelocity :: String  = "Nothing" 
+    projection_method :: String = "RK4"
 
     # Iterator type 
     # - standard : standard julia for loop  

@@ -16,6 +16,8 @@ function parallel_init(param)
         MPI.Init()
     end
 
+    
+
     comm = MPI.COMM_WORLD
     nproc = MPI.Comm_size(comm)
 
@@ -65,10 +67,20 @@ function update_borders!(A,mesh_par,par_env)
     update_borders_z!(A,mesh_par,par_env)
 
 end
-function update_borders_x!(A,mesh_par,par_env)
+
+function update_VF_borders!(A,mesh_par,par_env)
+    VFghost = 3
+    update_borders_x!(A,mesh_par,par_env,VFghost)
+    update_borders_y!(A,mesh_par,par_env,VFghost)
+    update_borders_z!(A,mesh_par,par_env,VFghost)
+
+end
+function update_borders_x!(A,mesh_par,par_env,VFghost=nothing)
     @unpack imin_,imax_,imino_,imaxo_,nghost = mesh_par
     @unpack comm = par_env
-    
+    if VFghost !== nothing
+        nghost == VFghost
+    end
     # Send to left neighbor 
     sendbuf = OffsetArrays.no_offset_view(A[imin_:imin_+nghost-1,:,:])
     recvbuf = OffsetArrays.no_offset_view(A[imax_+1:imaxo_,:,:])
@@ -85,10 +97,12 @@ function update_borders_x!(A,mesh_par,par_env)
 
     return nothing
 end
-function update_borders_y!(A,mesh_par,par_env)
+function update_borders_y!(A,mesh_par,par_env,VFghost=nothing)
     @unpack jmin_,jmax_,jmino_,jmaxo_,nghost = mesh_par
     @unpack comm = par_env
-    
+    if VFghost !== nothing
+        nghost == VFghost
+    end
     # Send to below neighbor 
     sendbuf = OffsetArrays.no_offset_view(A[:,jmin_:jmin_+nghost-1,:])
     recvbuf = OffsetArrays.no_offset_view(A[:,jmax_+1:jmaxo_,:])
@@ -105,10 +119,12 @@ function update_borders_y!(A,mesh_par,par_env)
 
     return nothing
 end
-function update_borders_z!(A,mesh_par,par_env)
+function update_borders_z!(A,mesh_par,par_env,VFghost=nothing)
     @unpack kmin_,kmax_,kmino_,kmaxo_,nghost = mesh_par
     @unpack comm = par_env
-    
+    if VFghost !== nothing
+        nghost == VFghost
+    end
     # Send to below neighbor 
     sendbuf = OffsetArrays.no_offset_view(A[:,:,kmin_:kmin_+nghost-1])
     recvbuf = OffsetArrays.no_offset_view(A[:,:,kmax_+1:kmaxo_])
@@ -125,6 +141,95 @@ function update_borders_z!(A,mesh_par,par_env)
 
     return nothing
 end
+
+"""
+Update ghost cells of A on parallel boundaries for face centered values
+"""
+function update_xface_borders!(A,mesh_par,par_env)
+    
+    update_face_borders_x!(A,mesh_par,par_env)
+    update_borders_y!(A,mesh_par,par_env)
+    update_borders_z!(A,mesh_par,par_env)
+
+end
+
+function update_yface_borders!(A,mesh_par,par_env)
+    
+    update_borders_x!(A,mesh_par,par_env)
+    update_face_borders_y!(A,mesh_par,par_env)
+    update_borders_z!(A,mesh_par,par_env)
+
+end
+
+function update_zface_borders!(A,mesh_par,par_env)
+    
+    update_borders_x!(A,mesh_par,par_env)
+    update_borders_y!(A,mesh_par,par_env)
+    update_face_borders_z!(A,mesh_par,par_env)
+
+end
+
+function update_face_borders_x!(A,mesh_par,par_env)
+    @unpack imin_,imax_,imino_,imaxo_,nghost = mesh_par
+    @unpack comm = par_env
+
+    # Send to left neighbor 
+    sendbuf = OffsetArrays.no_offset_view(A[imin_+1:imin_+nghost-1,:,:])
+    recvbuf = OffsetArrays.no_offset_view(A[imax_+2:imaxo_,:,:])
+    isource,idest = MPI.Cart_shift(comm,0,-1)
+    data, status = MPI.Sendrecv!(sendbuf,recvbuf,comm,dest=idest,source=isource)
+    A[imax_+2:imaxo_,:,:] = recvbuf
+
+    # Send to right neighbor 
+    sendbuf = OffsetArrays.no_offset_view(A[imax_-nghost+1:imax_,:,:])
+    recvbuf = OffsetArrays.no_offset_view(A[imino_:imin_-1,:,:])
+    isource,idest = MPI.Cart_shift(comm,0,+1)
+    data, status = MPI.Sendrecv!(sendbuf,recvbuf,comm,dest=idest,source=isource)
+    A[imino_:imin_-1,:,:] = recvbuf
+
+    return nothing
+end
+function update_face_borders_y!(A,mesh_par,par_env)
+    @unpack jmin_,jmax_,jmino_,jmaxo_,nghost = mesh_par
+    @unpack comm = par_env
+
+    # Send to below neighbor 
+    sendbuf = OffsetArrays.no_offset_view(A[:,jmin_+1:jmin_+nghost-1,:])
+    recvbuf = OffsetArrays.no_offset_view(A[:,jmax_+2:jmaxo_,:])
+    isource,idest = MPI.Cart_shift(comm,1,-1)
+    data, status = MPI.Sendrecv!(sendbuf,recvbuf,comm,dest=idest,source=isource)
+    A[:,jmax_+2:jmaxo_,:] = recvbuf
+
+    # Send to above neighbor 
+    sendbuf = OffsetArrays.no_offset_view(A[:,jmax_-nghost+1:jmax_,:])
+    recvbuf = OffsetArrays.no_offset_view(A[:,jmino_:jmin_-1,:])
+    isource,idest = MPI.Cart_shift(comm,1,+1)
+    data, status = MPI.Sendrecv!(sendbuf,recvbuf,comm,dest=idest,source=isource)
+    A[:,jmino_:jmin_-1,:] = recvbuf
+
+    return nothing
+end
+function update_face_borders_z!(A,mesh_par,par_env)
+    @unpack kmin_,kmax_,kmino_,kmaxo_,nghost = mesh_par
+    @unpack comm = par_env
+
+    # Send to below neighbor 
+    sendbuf = OffsetArrays.no_offset_view(A[:,:,kmin_+1:kmin_+nghost-1])
+    recvbuf = OffsetArrays.no_offset_view(A[:,:,kmax_+2:kmaxo_])
+    isource,idest = MPI.Cart_shift(comm,2,-1)
+    data, status = MPI.Sendrecv!(sendbuf,recvbuf,comm,dest=idest,source=isource)
+    A[:,:,kmax_+2:kmaxo_] = recvbuf
+
+    # Send to above neighbor 
+    sendbuf = OffsetArrays.no_offset_view(A[:,:,kmax_-nghost+1:kmax_])
+    recvbuf = OffsetArrays.no_offset_view(A[:,:,kmino_:kmin_-1])
+    isource,idest = MPI.Cart_shift(comm,2,+1)
+    data, status = MPI.Sendrecv!(sendbuf,recvbuf,comm,dest=idest,source=isource)
+    A[:,:,kmino_:kmin_-1] = recvbuf
+
+    return nothing
+end
+
 
 """
 Wrapper for MPI.Reduce and MPI.Allreduce
@@ -166,4 +271,15 @@ function parallel_min(A,par_env)
 end
 function parallel_min_all(A,par_env)
     return callReduce_all(minimum(A),par_env,MPI.MIN)
+end
+
+
+""" 
+Parallel Mean of A (by default output goes only to iroot)
+"""
+function parallel_mean(A,par_env)
+    return parallel_sum(A,par_env)/parallel_sum(length(A),par_env)
+end
+function parallel_mean_all(A,par_env)
+    return parallel_sum_all(A,par_env)/parallel_sum_all(length(A),par_env)
 end

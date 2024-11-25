@@ -18,17 +18,39 @@ function computeBand!(band,VF,param,mesh,par_env)
     @unpack imin_,imax_,jmin_,jmax_,kmin_,kmax_ = mesh 
 
     # Number of bands to create 
-    nband=2
+    nband=1
 
     # Sweep to set gas/liquid/interface cells 
     @loop param for k=kmin_:kmax_, j=jmin_:jmax_, i=imin_:imax_
+        # if VF[i,j,k] < VFlo
+        #     band[i,j,k] = -nband-1
+        # elseif VF[i,j,k] > VFhi 
+        #     band[i,j,k] = +nband+1
+        # else
+        #     band[i,j,k] = 0
+        # end
         if VF[i,j,k] < VFlo
-            band[i,j,k] = -nband-1
-        elseif VF[i,j,k] > VFhi 
-            band[i,j,k] = +nband+1
+            for kk=k-1:k+1,jj=j-1:j+1, ii=i-1:i+1
+                if VF[ii,jj,kk] >= VFhi
+                    band[i,j,k] = 0
+                    break
+                else 
+                    band[i,j,k] = -nband-1
+                end
+            end
+        elseif VF[i,j,k] > VFhi
+            for kk=k-1:k+1,jj=j-1:j+1, ii=i-1:i+1
+                if VF[ii,jj,kk] <= VFlo
+                    band[i,j,k] = 0
+                    break
+                else 
+                    band[i,j,k] = +nband+1
+                end
+            end 
         else
             band[i,j,k] = 0
         end
+        
         # TODO: Add check for implicit interfaces between cells (only will matter for test cases)
     end
     Neumann!(band,mesh,par_env)
@@ -194,18 +216,19 @@ end
 """ 
 Compute liquid volume in cell using PLIC
 """
-function computePLIC2VF(i,j,k,nx,ny,nz,dist,mesh)    
+function computePLIC2VF(i,j,k,nx,ny,nz,dist,param,mesh)    
     @unpack x,y,z = mesh
     @unpack dx,dy,dz = mesh
     
     # Allocate work arrays 
     tet = Array{Float64}(undef,3,4)
+    tets = Array{Float64}(undef,3,4,5)
     vert = Array{Float64}(undef,3,8)
     d = Array{Float64}(undef,4)
-    
+    # ext = get_
     # Compute VF in this cell 
     VF=0.0
-    tets=cell2tets(i,j,k,mesh)
+    tetsign = cell2tets!(vert,tets,i,j,k,param,mesh)
     for t=1:5
         # Copy verts
         for n=1:4
@@ -238,48 +261,19 @@ function computePLIC2VF(i,j,k,nx,ny,nz,dist,mesh)
                 end
             end
             # Compute volume
-            VF += tet_vol(tet)/(dx*dy*dz)
+            VF += tetsign*tet_vol(tet)/(dx*dy*dz)
         end
     end
     return VF
 end
 
-""" 
-Semi-Lagrangian projection of point back in time 
-""" 
-function project(pt,i,j,k,u,v,w,dt,mesh)
-    v1=get_velocity(pt         ,i,j,k,u,v,w,mesh)
-    v2=get_velocity(pt+0.5dt*v1,i,j,k,u,v,w,mesh)
-    v3=get_velocity(pt+0.5dt*v2,i,j,k,u,v,w,mesh)
-    v4=get_velocity(pt+   dt*v3,i,j,k,u,v,w,mesh)
-    pt+=dt/6.0*(v1+2.0v2+2.0v3+v4)
-    return pt 
-end
-
-""" 
-Semi-Lagrangian projection of point back in time 
-using face velocities
-""" 
-function project_uvwf(pt,i,j,k,uf,vf,wf,dt,mesh)
-    v1=get_velocity_face(pt         ,i,j,k,uf,vf,wf,mesh)
-    pt+=dt*v1
-    return pt 
-end
-# function project_uvwf(pt,i,j,k,uf,vf,wf,dt,mesh)
-#     v1=get_velocity_face(pt         ,i,j,k,uf,vf,wf,mesh)
-#     v2=get_velocity_face(pt+0.5dt*v1,i,j,k,uf,vf,wf,mesh)
-#     v3=get_velocity_face(pt+0.5dt*v2,i,j,k,uf,vf,wf,mesh)
-#     v4=get_velocity_face(pt+   dt*v3,i,j,k,uf,vf,wf,mesh)
-#     pt+=dt/6.0*(v1+2.0v2+2.0v3+v4)
-#     return pt 
-# end
 
 """ 
 Compute unstructured mesh representing PLIC 
 - points - vertices of each triangle 
 - tris - [ntri,3] array of points that make up each triangle 
 """
-function PLIC2Mesh(nx,ny,nz,D,VF,param,mesh)
+function PLIC2Mesh(nx,ny,nz,D,VF,verts,tets,param,mesh)
     @unpack x,y,z = mesh
     @unpack VFlo, VFhi = param
     @unpack imin_,imax_,jmin_,jmax_,kmin_,kmax_ = mesh 
@@ -301,7 +295,7 @@ function PLIC2Mesh(nx,ny,nz,D,VF,param,mesh)
         # Check for interface
         if VF[i,j,k] >= VFlo && VF[i,j,k] <= VFhi
             # Construct tets in cell 
-            tets = cell2tets(i,j,k,mesh)
+            tetsign = cell2tets!(verts,tets,i,j,k,param,mesh)
             for tet=1:5
                 # Copy verts
                 for n=1:4

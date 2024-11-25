@@ -164,64 +164,52 @@ const cut_side = SArray{Tuple{6,16}}([
         2 -1 -1 -1 -1 -1
     ]')
 
-function cell2tets(i, j, k, mesh)
-    @unpack x, y, z = mesh
-    # Cell vertices 
-    p1x = x[i]  ; p1y = y[j]  ; p1z = z[k]  
-    p2x = x[i+1]; p2y = y[j]  ; p2z = z[k]  
-    p3x = x[i]  ; p3y = y[j+1]; p3z = z[k]  
-    p4x = x[i+1]; p4y = y[j+1]; p4z = z[k]  
-    p5x = x[i]  ; p5y = y[j]  ; p5z = z[k+1] 
-    p6x = x[i+1]; p6y = y[j]  ; p6z = z[k+1]
-    p7x = x[i]  ; p7y = y[j+1]; p7z = z[k+1]
-    p8x = x[i+1]; p8y = y[j+1]; p8z = z[k+1]
-    # Make five tets 
-    tets = Array{Float64}(undef, 3, 4, 5)
-    tets[1, 1, 1] = p1x; tets[2, 1, 1] = p1y; tets[3, 1, 1] = p1z
-    tets[1, 2, 1] = p2x; tets[2, 2, 1] = p2y; tets[3, 2, 1] = p2z
-    tets[1, 3, 1] = p4x; tets[2, 3, 1] = p4y; tets[3, 3, 1] = p4z
-    tets[1, 4, 1] = p6x; tets[2, 4, 1] = p6y; tets[3, 4, 1] = p6z
-    tets[1, 1, 2] = p1x; tets[2, 1, 2] = p1y; tets[3, 1, 2] = p1z
-    tets[1, 2, 2] = p4x; tets[2, 2, 2] = p4y; tets[3, 2, 2] = p4z
-    tets[1, 3, 2] = p3x; tets[2, 3, 2] = p3y; tets[3, 3, 2] = p3z
-    tets[1, 4, 2] = p7x; tets[2, 4, 2] = p7y; tets[3, 4, 2] = p7z
-    tets[1, 1, 3] = p1x; tets[2, 1, 3] = p1y; tets[3, 1, 3] = p1z
-    tets[1, 2, 3] = p5x; tets[2, 2, 3] = p5y; tets[3, 2, 3] = p5z
-    tets[1, 3, 3] = p6x; tets[2, 3, 3] = p6y; tets[3, 3, 3] = p6z
-    tets[1, 4, 3] = p7x; tets[2, 4, 3] = p7y; tets[3, 4, 3] = p7z
-    tets[1, 1, 4] = p4x; tets[2, 1, 4] = p4y; tets[3, 1, 4] = p4z
-    tets[1, 2, 4] = p7x; tets[2, 2, 4] = p7y; tets[3, 2, 4] = p7z
-    tets[1, 3, 4] = p6x; tets[2, 3, 4] = p6y; tets[3, 3, 4] = p6z
-    tets[1, 4, 4] = p8x; tets[2, 4, 4] = p8y; tets[3, 4, 4] = p8z
-    tets[1, 1, 5] = p1x; tets[2, 1, 5] = p1y; tets[3, 1, 5] = p1z
-    tets[1, 2, 5] = p4x; tets[2, 2, 5] = p4y; tets[3, 2, 5] = p4z
-    tets[1, 3, 5] = p7x; tets[2, 3, 5] = p7y; tets[3, 3, 5] = p7z
-    tets[1, 4, 5] = p6x; tets[2, 4, 5] = p6y; tets[3, 4, 5] = p6z
-    return tets
+"""
+Classify cell as either even (true) or odd (false) based on index
+- used to set ordering of vertices to make discretization of faces consistent
+"""
+function oddEvenCell(i,j,k)
+    return (i+j+k) % 2 == 0
 end
 
-function cell2tets_withProject(i, j, k, u, v, w, dt, mesh)
+"""
+Determine verts for a cell in ordering that triangulates faces consistently
+    - verts is a 3x8 array and that is filled by this function
+"""
+function cell2verts!(verts,i,j,k,mesh)
     @unpack x, y, z = mesh
-    # Cell vertices 
-    p = Matrix{Float64}(undef, (3, 8))
-    p[:, 1] = [x[i], y[j], z[k]]
-    p[:, 2] = [x[i+1], y[j], z[k]]
-    p[:, 3] = [x[i], y[j+1], z[k]]
-    p[:, 4] = [x[i+1], y[j+1], z[k]]
-    p[:, 5] = [x[i], y[j], z[k+1]]
-    p[:, 6] = [x[i+1], y[j], z[k+1]]
-    p[:, 7] = [x[i], y[j+1], z[k+1]]
-    p[:, 8] = [x[i+1], y[j+1], z[k+1]]
-    # For each vertex
-    I = Matrix{Int64}(undef, (3, 8))
-    for n = 1:8
-        # Perform semi-Lagrangian projection
-        p[:, n] = project(p[:, n], i, j, k, u, v, w, -dt, mesh)
-        # Get cell index of projected vertex
-        I[:, n] = pt2index(p[:, n], i, j, k, mesh)
+
+    # Determine verts for odd or even cell
+    if oddEvenCell(i,j,k)
+        tetsign = +1.0
+        verts[:,1] = [x[i  ], y[j  ], z[k  ]]
+        verts[:,2] = [x[i+1], y[j  ], z[k  ]]
+        verts[:,3] = [x[i  ], y[j+1], z[k  ]]
+        verts[:,4] = [x[i+1], y[j+1], z[k  ]]
+        verts[:,5] = [x[i  ], y[j  ], z[k+1]]
+        verts[:,6] = [x[i+1], y[j  ], z[k+1]]
+        verts[:,7] = [x[i  ], y[j+1], z[k+1]]
+        verts[:,8] = [x[i+1], y[j+1], z[k+1]]
+    else
+        tetsign = -1.0
+        verts[:,1] = [x[i+1], y[j  ], z[k  ]]  
+        verts[:,2] = [x[i  ], y[j  ], z[k  ]]  
+        verts[:,3] = [x[i+1], y[j+1], z[k  ]]  
+        verts[:,4] = [x[i  ], y[j+1], z[k  ]]  
+        verts[:,5] = [x[i+1], y[j  ], z[k+1]] 
+        verts[:,6] = [x[i  ], y[j  ], z[k+1]]
+        verts[:,7] = [x[i+1], y[j+1], z[k+1]]
+        verts[:,8] = [x[i  ], y[j+1], z[k+1]]
     end
+    return tetsign
+end  
+
+""" 
+Make 5 tets out of a polyhedron represented by 8 vertices
+    - tets is is a 3x4x5 array that is filled by this function
+"""
+function verts2tets!(tets,p)
     # Make five tets 
-    tets = Array{Float64}(undef, 3, 4, 5)
     tets[:, 1, 1] = p[:, 1]
     tets[:, 2, 1] = p[:, 2]
     tets[:, 3, 1] = p[:, 4]
@@ -242,102 +230,265 @@ function cell2tets_withProject(i, j, k, u, v, w, dt, mesh)
     tets[:, 2, 5] = p[:, 4]
     tets[:, 3, 5] = p[:, 7]
     tets[:, 4, 5] = p[:, 6]
-
-    # Make five tets 
-    inds = Array{Int64}(undef, 3, 4, 5)
-    inds[:, 1, 1] = I[:, 1]
-    inds[:, 2, 1] = I[:, 2]
-    inds[:, 3, 1] = I[:, 4]
-    inds[:, 4, 1] = I[:, 6]
-    inds[:, 1, 2] = I[:, 1]
-    inds[:, 2, 2] = I[:, 4]
-    inds[:, 3, 2] = I[:, 3]
-    inds[:, 4, 2] = I[:, 7]
-    inds[:, 1, 3] = I[:, 1]
-    inds[:, 2, 3] = I[:, 5]
-    inds[:, 3, 3] = I[:, 6]
-    inds[:, 4, 3] = I[:, 7]
-    inds[:, 1, 4] = I[:, 4]
-    inds[:, 2, 4] = I[:, 7]
-    inds[:, 3, 4] = I[:, 6]
-    inds[:, 4, 4] = I[:, 8]
-    inds[:, 1, 5] = I[:, 1]
-    inds[:, 2, 5] = I[:, 4]
-    inds[:, 3, 5] = I[:, 7]
-    inds[:, 4, 5] = I[:, 6]
-
-    return tets, inds
+    return nothing
 end
 
-function cell2tets_withProject_uvwf(i, j, k, uf, vf, wf, dt, mesh)
+        
+"""
+Create 5 tets to represent computational cell
+    - verts is a 3x8   array that is filled by this function
+    - tets  is a 3x4x5 array that is filled by this function
+    - options:
+        - project: if true then verts are projected - uf,vf,wf, and dt are required
+        - indices: if true then indices of projected verts are computed 
+            - ind (3x4x5) array is filled by this function
+            - I (3x8 work array) is required
+"""
+function cell2tets!(verts, tets, i, j, k, param, mesh; 
+    project_verts=false, uf=nothing, vf=nothing, wf=nothing, dt=nothing, 
+    compute_indices=false, inds=nothing, vInds=nothing
+    )
     @unpack x, y, z = mesh
+    
     # Cell vertices 
-    p = Matrix{Float64}(undef, (3, 8))
-    p[:, 1] = [x[i], y[j], z[k]]
-    p[:, 2] = [x[i+1], y[j], z[k]]
-    p[:, 3] = [x[i], y[j+1], z[k]]
-    p[:, 4] = [x[i+1], y[j+1], z[k]]
-    p[:, 5] = [x[i], y[j], z[k+1]]
-    p[:, 6] = [x[i+1], y[j], z[k+1]]
-    p[:, 7] = [x[i], y[j+1], z[k+1]]
-    p[:, 8] = [x[i+1], y[j+1], z[k+1]]
-    # For each vertex
-    I = Matrix{Int64}(undef, (3, 8))
-    for n = 1:8
-        # Perform semi-Lagrangian projection
-        p[:, n] = project_uvwf(p[:, n], i, j, k, uf, vf, wf, -dt, mesh)
-        # Get cell index of projected vertex
-        I[:, n] = pt2index(p[:, n], i, j, k, mesh)
+    tetsign = cell2verts!(verts,i,j,k,mesh)
+
+    # Project if requested 
+    if project_verts
+        for n=1:8
+            project!(@view(verts[:,n]),i,j,k,uf,vf,wf,dt,param,mesh)
+        end
     end
-    # Make five tets 
-    tets = Array{Float64}(undef, 3, 4, 5)
-    tets[:, 1, 1] = p[:, 1]
-    tets[:, 2, 1] = p[:, 2]
-    tets[:, 3, 1] = p[:, 4]
-    tets[:, 4, 1] = p[:, 6]
-    tets[:, 1, 2] = p[:, 1]
-    tets[:, 2, 2] = p[:, 4]
-    tets[:, 3, 2] = p[:, 3]
-    tets[:, 4, 2] = p[:, 7]
-    tets[:, 1, 3] = p[:, 1]
-    tets[:, 2, 3] = p[:, 5]
-    tets[:, 3, 3] = p[:, 6]
-    tets[:, 4, 3] = p[:, 7]
-    tets[:, 1, 4] = p[:, 4]
-    tets[:, 2, 4] = p[:, 7]
-    tets[:, 3, 4] = p[:, 6]
-    tets[:, 4, 4] = p[:, 8]
-    tets[:, 1, 5] = p[:, 1]
-    tets[:, 2, 5] = p[:, 4]
-    tets[:, 3, 5] = p[:, 7]
-    tets[:, 4, 5] = p[:, 6]
 
     # Make five tets 
-    inds = Array{Int64}(undef, 3, 4, 5)
-    inds[:, 1, 1] = I[:, 1]
-    inds[:, 2, 1] = I[:, 2]
-    inds[:, 3, 1] = I[:, 4]
-    inds[:, 4, 1] = I[:, 6]
-    inds[:, 1, 2] = I[:, 1]
-    inds[:, 2, 2] = I[:, 4]
-    inds[:, 3, 2] = I[:, 3]
-    inds[:, 4, 2] = I[:, 7]
-    inds[:, 1, 3] = I[:, 1]
-    inds[:, 2, 3] = I[:, 5]
-    inds[:, 3, 3] = I[:, 6]
-    inds[:, 4, 3] = I[:, 7]
-    inds[:, 1, 4] = I[:, 4]
-    inds[:, 2, 4] = I[:, 7]
-    inds[:, 3, 4] = I[:, 6]
-    inds[:, 4, 4] = I[:, 8]
-    inds[:, 1, 5] = I[:, 1]
-    inds[:, 2, 5] = I[:, 4]
-    inds[:, 3, 5] = I[:, 7]
-    inds[:, 4, 5] = I[:, 6]
+    verts2tets!(tets,verts)
 
-    return tets, inds
+    # Compute indices if requested
+    if compute_indices
+        for n=1:8
+            pt2index!(@view(vInds[:,n]),@view(verts[:,n]),i,j,k,mesh)
+        end 
+        verts2tets!(inds,vInds)
+    end
+    
+    return tetsign
 end
 
+""" 
+Determine volume of semi-Lagrangian flux on face
+- consistent with cell2tets! discretization  
+- verts is a 3x8 work array 
+- tets is a 3x4x5 work array 
+"""
+function SLfluxVol(dir,i,j,k,verts,tets,uf,vf,wf,dt,param,mesh)
+    @unpack x,y,z = mesh
+
+    # Form verts on flux volume 
+    if dir == 1 # x
+        if oddEvenCell(i,j,k)
+            tetsign = +1.0
+            verts[:,1] = [x[i  ], y[j  ], z[k  ]]; project!(@view(verts[:,1]),i,j,k,uf,vf,wf,dt,param,mesh)
+            verts[:,2] = [x[i  ], y[j  ], z[k  ]];
+            verts[:,3] = [x[i  ], y[j+1], z[k  ]]; project!(@view(verts[:,3]),i,j,k,uf,vf,wf,dt,param,mesh)
+            verts[:,4] = [x[i  ], y[j+1], z[k  ]];
+            verts[:,5] = [x[i  ], y[j  ], z[k+1]]; project!(@view(verts[:,5]),i,j,k,uf,vf,wf,dt,param,mesh)
+            verts[:,6] = [x[i  ], y[j  ], z[k+1]];
+            verts[:,7] = [x[i  ], y[j+1], z[k+1]]; project!(@view(verts[:,7]),i,j,k,uf,vf,wf,dt,param,mesh)
+            verts[:,8] = [x[i  ], y[j+1], z[k+1]];
+        else
+            tetsign = -1.0
+            verts[:,1] = [x[i  ], y[j  ], z[k  ]];
+            verts[:,2] = [x[i  ], y[j  ], z[k  ]]; project!(@view(verts[:,2]),i,j,k,uf,vf,wf,dt,param,mesh)
+            verts[:,3] = [x[i  ], y[j+1], z[k  ]];
+            verts[:,4] = [x[i  ], y[j+1], z[k  ]]; project!(@view(verts[:,4]),i,j,k,uf,vf,wf,dt,param,mesh)
+            verts[:,5] = [x[i  ], y[j  ], z[k+1]];
+            verts[:,6] = [x[i  ], y[j  ], z[k+1]]; project!(@view(verts[:,6]),i,j,k,uf,vf,wf,dt,param,mesh)
+            verts[:,7] = [x[i  ], y[j+1], z[k+1]];
+            verts[:,8] = [x[i  ], y[j+1], z[k+1]]; project!(@view(verts[:,8]),i,j,k,uf,vf,wf,dt,param,mesh)
+        end
+    elseif dir == 2 # y
+        if oddEvenCell(i,j,k)
+            tetsign = +1.0
+            verts[:,1] = [x[i  ], y[j  ], z[k  ]]; project!(@view(verts[:,1]),i,j,k,uf,vf,wf,dt,param,mesh)
+            verts[:,2] = [x[i+1], y[j  ], z[k  ]]; project!(@view(verts[:,2]),i,j,k,uf,vf,wf,dt,param,mesh)
+            verts[:,3] = [x[i  ], y[j  ], z[k  ]]; 
+            verts[:,4] = [x[i+1], y[j  ], z[k  ]];
+            verts[:,5] = [x[i  ], y[j  ], z[k+1]]; project!(@view(verts[:,5]),i,j,k,uf,vf,wf,dt,param,mesh)
+            verts[:,6] = [x[i+1], y[j  ], z[k+1]]; project!(@view(verts[:,6]),i,j,k,uf,vf,wf,dt,param,mesh)
+            verts[:,7] = [x[i  ], y[j  ], z[k+1]]; 
+            verts[:,8] = [x[i+1], y[j  ], z[k+1]];
+        else
+            tetsign = -1.0
+            verts[:,1] = [x[i+1], y[j  ], z[k  ]]; project!(@view(verts[:,1]),i,j,k,uf,vf,wf,dt,param,mesh)
+            verts[:,2] = [x[i  ], y[j  ], z[k  ]]; project!(@view(verts[:,2]),i,j,k,uf,vf,wf,dt,param,mesh)
+            verts[:,3] = [x[i+1], y[j  ], z[k  ]]; 
+            verts[:,4] = [x[i  ], y[j  ], z[k  ]];
+            verts[:,5] = [x[i+1], y[j  ], z[k+1]]; project!(@view(verts[:,5]),i,j,k,uf,vf,wf,dt,param,mesh)
+            verts[:,6] = [x[i  ], y[j  ], z[k+1]]; project!(@view(verts[:,6]),i,j,k,uf,vf,wf,dt,param,mesh)
+            verts[:,7] = [x[i+1], y[j  ], z[k+1]]; 
+            verts[:,8] = [x[i  ], y[j  ], z[k+1]];
+        end
+    elseif dir == 3 # z
+        if oddEvenCell(i,j,k)
+            tetsign = +1.0
+            verts[:,1] = [x[i  ], y[j  ], z[k  ]]; project!(@view(verts[:,1]),i,j,k,uf,vf,wf,dt,param,mesh)
+            verts[:,2] = [x[i+1], y[j  ], z[k  ]]; project!(@view(verts[:,2]),i,j,k,uf,vf,wf,dt,param,mesh)
+            verts[:,3] = [x[i  ], y[j+1], z[k  ]]; project!(@view(verts[:,3]),i,j,k,uf,vf,wf,dt,param,mesh)
+            verts[:,4] = [x[i+1], y[j+1], z[k  ]]; project!(@view(verts[:,4]),i,j,k,uf,vf,wf,dt,param,mesh)
+            verts[:,5] = [x[i  ], y[j  ], z[k  ]]; 
+            verts[:,6] = [x[i+1], y[j  ], z[k  ]]; 
+            verts[:,7] = [x[i  ], y[j+1], z[k  ]]; 
+            verts[:,8] = [x[i+1], y[j+1], z[k  ]];
+        else
+            tetsign = -1.0
+            verts[:,1] = [x[i+1], y[j  ], z[k  ]]; project!(@view(verts[:,1]),i,j,k,uf,vf,wf,dt,param,mesh)
+            verts[:,2] = [x[i  ], y[j  ], z[k  ]]; project!(@view(verts[:,2]),i,j,k,uf,vf,wf,dt,param,mesh)
+            verts[:,3] = [x[i+1], y[j+1], z[k  ]]; project!(@view(verts[:,3]),i,j,k,uf,vf,wf,dt,param,mesh)
+            verts[:,4] = [x[i  ], y[j+1], z[k  ]]; project!(@view(verts[:,4]),i,j,k,uf,vf,wf,dt,param,mesh)
+            verts[:,5] = [x[i+1], y[j  ], z[k  ]]; 
+            verts[:,6] = [x[i  ], y[j  ], z[k  ]]; 
+            verts[:,7] = [x[i+1], y[j+1], z[k  ]]; 
+            verts[:,8] = [x[i  ], y[j+1], z[k  ]];
+        end
+    else
+        error("Unknown direction in SLfluxVol")
+    end
+    
+    # Make five tets 
+    verts2tets!(tets,verts)
+
+     # Compute flux volume 
+     flux_vol = tets_vol(tets) * tetsign
+    
+     return flux_vol
+end
+
+"""
+Add correction tets on to semi-Lagrangian cell
+"""
+function add_correction_tets(ntets,verts,tets, inds, i, j, k, uf, vf, wf, dt, param, mesh)
+    @unpack dx,dy,dz = mesh
+
+    """ 
+    Add correction tets on faces 
+        - verts is a 3x8 work array 
+    """
+    function add_correction_tets_x(tets,verts,i,j,k)
+        # Create seperate tets work array to not impact exisiting tets 
+        tets_work  = Array{Float64}(undef, 3, 4, 5)
+        # Constrct SL flux volume - compute volume and set verts 
+        flux_vol = SLfluxVol(1,i,j,k,verts,tets_work,uf,vf,wf,dt,param,mesh)
+        # Compute required volume 
+        divg_vol = dt*dy*dz*uf[i,j,k]
+        # Create array with 2 additional tets appended 
+        ntets = size(tets,3)
+        newtets = Array{eltype(tets)}(undef, 3, 4, ntets+2)
+        newtets[:,:,1:ntets] = tets
+        # Construct correction tets
+        if oddEvenCell(i,j,k)
+            newtets[:,:,ntets+1:ntets+2] = correction_tets_x(verts[:,5],verts[:,7],verts[:,3],verts[:,1],+(divg_vol - flux_vol))
+        else
+            newtets[:,:,ntets+1:ntets+2] = correction_tets_x(verts[:,8],verts[:,6],verts[:,2],verts[:,4],-(divg_vol - flux_vol))
+        end
+        return newtets
+    end
+    function add_correction_tets_y(tets,verts,i,j,k)
+        # Create seperate tets work array to not impact exisiting tets 
+        tets_work  = Array{Float64}(undef, 3, 4, 5)
+        # Constrct SL flux volume - compute volume and set verts 
+        flux_vol = SLfluxVol(2,i,j,k,verts,tets_work,uf,vf,wf,dt,param,mesh)
+        # Compute required volume 
+        divg_vol = dt*dx*dz*vf[i,j,k]
+        # Create array with 2 additional tets appended 
+        ntets = size(tets,3)
+        newtets = Array{eltype(tets)}(undef, 3, 4, ntets+2)
+        newtets[:,:,1:ntets] = tets
+        # Construct correction tets
+        if oddEvenCell(i,j,k)
+            newtets[:,:,ntets+1:ntets+2] = correction_tets_y(verts[:,2],verts[:,6],verts[:,5],verts[:,1],+(divg_vol - flux_vol))
+        else
+            newtets[:,:,ntets+1:ntets+2] = correction_tets_y(verts[:,2],verts[:,6],verts[:,5],verts[:,1],-(divg_vol - flux_vol))
+        end
+        return newtets
+    end
+    function add_correction_tets_z(tets,verts,i,j,k)
+        # Create seperate tets work array to not impact exisiting tets 
+        tets_work  = Array{Float64}(undef, 3, 4, 5)
+        # Constrct SL flux volume - compute volume and set verts 
+        flux_vol = SLfluxVol(3,i,j,k,verts,tets_work,uf,vf,wf,dt,param,mesh)
+        # Compute required volume 
+        divg_vol = dt*dx*dy*wf[i,j,k]
+        # Create array with 2 additional tets appended 
+        ntets = size(tets,3)
+        newtets = Array{eltype(tets)}(undef, 3, 4, ntets+2)
+        newtets[:,:,1:ntets] = tets
+        # Construct correction tets
+        if oddEvenCell(i,j,k)
+            newtets[:,:,ntets+1:ntets+2] = correction_tets_z(verts[:,2],verts[:,1],verts[:,3],verts[:,4],+(divg_vol - flux_vol))
+        else
+            newtets[:,:,ntets+1:ntets+2] = correction_tets_z(verts[:,2],verts[:,1],verts[:,3],verts[:,4],-(divg_vol - flux_vol))
+        end
+        return newtets
+    end
+
+    function correction_tets_x(a,b,c,d,vol)
+        tets = Array{eltype(tets)}(undef, 3, 4, 2)
+        e = 0.25*(a+b+c+d)
+        e[1] = ( (6.0*vol + a[1]*b[2]*d[3] - a[1]*b[3]*d[2] - a[2]*b[1]*d[3] + a[2]*b[3]*d[1] + a[3]*b[1]*d[2]
+               - a[3]*b[2]*d[1] - a[1]*b[2]*e[3] + a[1]*b[3]*e[2] + a[2]*b[1]*e[3] - a[3]*b[1]*e[2] + b[1]*c[2]*d[3] 
+               - b[1]*c[3]*d[2] - b[2]*c[1]*d[3] + b[2]*c[3]*d[1] + b[3]*c[1]*d[2] - b[3]*c[2]*d[1] + a[1]*d[2]*e[3] 
+               - a[1]*d[3]*e[2] - a[2]*d[1]*e[3] + a[3]*d[1]*e[2] - b[1]*c[2]*e[3] + b[1]*c[3]*e[2] + b[2]*c[1]*e[3] 
+               - b[3]*c[1]*e[2] - c[1]*d[2]*e[3] + c[1]*d[3]*e[2] + c[2]*d[1]*e[3] - c[3]*d[1]*e[2]) 
+               / (a[2]*b[3] - a[3]*b[2] - a[2]*d[3] + a[3]*d[2] + b[2]*c[3] - b[3]*c[2] + c[2]*d[3] - c[3]*d[2]) )
+        tets[:,1,1]=a; tets[:,2,1]=b; tets[:,3,1]=d; tets[:,4,1]=e;
+        tets[:,1,2]=b; tets[:,2,2]=c; tets[:,3,2]=d; tets[:,4,2]=e;
+        return tets
+    end
+    function correction_tets_y(a,b,c,d,vol)
+        tets = Array{eltype(tets)}(undef, 3, 4, 2)
+        e=0.25*(a+b+c+d)
+        e[2] = ( -(6.0*vol + a[1]*b[2]*d[3] - a[1]*b[3]*d[2] - a[2]*b[1]*d[3] + a[2]*b[3]*d[1] + a[3]*b[1]*d[2] 
+               - a[3]*b[2]*d[1] - a[1]*b[2]*e[3] + a[2]*b[1]*e[3] - a[2]*b[3]*e[1] + a[3]*b[2]*e[1] + b[1]*c[2]*d[3] 
+               - b[1]*c[3]*d[2] - b[2]*c[1]*d[3] + b[2]*c[3]*d[1] + b[3]*c[1]*d[2] - b[3]*c[2]*d[1] + a[1]*d[2]*e[3] 
+               - a[2]*d[1]*e[3] + a[2]*d[3]*e[1] - a[3]*d[2]*e[1] - b[1]*c[2]*e[3] + b[2]*c[1]*e[3] - b[2]*c[3]*e[1] 
+               + b[3]*c[2]*e[1] - c[1]*d[2]*e[3] + c[2]*d[1]*e[3] - c[2]*d[3]*e[1] + c[3]*d[2]*e[1]) 
+               / (a[1]*b[3] - a[3]*b[1] - a[1]*d[3] + a[3]*d[1] + b[1]*c[3] - b[3]*c[1] + c[1]*d[3] - c[3]*d[1]) )
+        tets[:,1,1]=a; tets[:,2,1]=b; tets[:,3,1]=d; tets[:,4,1]=e;
+        tets[:,1,2]=b; tets[:,2,2]=c; tets[:,3,2]=d; tets[:,4,2]=e;
+        return tets
+    end
+    function correction_tets_z(a,b,c,d,vol)
+        tets = Array{eltype(tets)}(undef, 3, 4, 2)
+        e=0.25*(a+b+c+d)
+        e[3] = ( (6.0*vol + a[1]*b[2]*d[3] - a[1]*b[3]*d[2] - a[2]*b[1]*d[3] + a[2]*b[3]*d[1] + a[3]*b[1]*d[2] 
+               - a[3]*b[2]*d[1] + a[1]*b[3]*e[2] - a[2]*b[3]*e[1] - a[3]*b[1]*e[2] + a[3]*b[2]*e[1] + b[1]*c[2]*d[3] 
+               - b[1]*c[3]*d[2] - b[2]*c[1]*d[3] + b[2]*c[3]*d[1] + b[3]*c[1]*d[2] - b[3]*c[2]*d[1] - a[1]*d[3]*e[2] 
+               + a[2]*d[3]*e[1] + a[3]*d[1]*e[2] - a[3]*d[2]*e[1] + b[1]*c[3]*e[2] - b[2]*c[3]*e[1] - b[3]*c[1]*e[2] 
+               + b[3]*c[2]*e[1] + c[1]*d[3]*e[2] - c[2]*d[3]*e[1] - c[3]*d[1]*e[2] + c[3]*d[2]*e[1]) 
+               / (a[1]*b[2] - a[2]*b[1] - a[1]*d[2] + a[2]*d[1] + b[1]*c[2] - b[2]*c[1] + c[1]*d[2] - c[2]*d[1]) )
+        tets[:,1,1]=a; tets[:,2,1]=b; tets[:,3,1]=d; tets[:,4,1]=e;
+        tets[:,1,2]=b; tets[:,2,2]=c; tets[:,3,2]=d; tets[:,4,2]=e;
+        return tets
+    end
+
+    # Add 2 tets to correct flux on each face 
+    new_tets = tets[:,:,1:5]
+    new_tets = add_correction_tets_x(new_tets,verts,i  ,j,k); ntets += 2
+    new_tets = add_correction_tets_x(new_tets,verts,i+1,j,k); ntets += 2
+    new_tets = add_correction_tets_y(new_tets,verts,i,j  ,k); ntets += 2
+    new_tets = add_correction_tets_y(new_tets,verts,i,j+1,k); ntets += 2
+    new_tets = add_correction_tets_z(new_tets,verts,i,j,k  ); ntets += 2
+    new_tets = add_correction_tets_z(new_tets,verts,i,j,k+1); ntets += 2
+    # Compute indices of new tets 
+    new_inds = Array{eltype(inds)}(undef, size(new_tets))
+    new_inds[:,:,1:5] = inds[:,:,1:5] # transfer original indices 
+    for n = 6:size(new_tets,3)
+        for v = 1:4
+            pt2index!(@view(new_inds[:,v,n]),@view(new_tets[:,v,n]),i,j,k,mesh)
+        end
+    end
+    return new_tets, new_inds, ntets
+end
 
 """
 Computes volume of tet
@@ -350,20 +501,19 @@ function tet_vol(verts)
         ( a(1) * (b(2) * c(3) - c(2) * b(3))
         - a(2) * (b(1) * c(3) - c(1) * b(3))
         + a(3) * (b(1) * c(2) - c(1) * b(2)))
+    if tet_vol == isnan
+        error("tet_vol is nan")
+    end
     return tet_vol
 end
 
-"""
-Computes volume of tets
-"""
 function tets_vol(tets)
-    tets_vol = 0.0 
-    for n in 1:size(tets,3)
-        tets_vol += tet_vol(tets[:,:,n])
+    vol= 0.0
+    for n=1:size(tets,3)
+        vol += tet_vol(tets[:,:,n])
     end
-    return tets_vol
+    return vol
 end
-
 """ 
 Determine cut case based on sign of d's
 """
@@ -527,7 +677,7 @@ function cutTet(tet, ind, u, v, w, xdone, ydone, zdone, nx, ny, nz, D, mesh,lvl,
         i = vert_ind[1, n, 1,lvl,id]
         j = vert_ind[2, n, 1,lvl,id]
         k = vert_ind[3, n, 1,lvl,id]
-        vert_ind[:, 4+n, 1,lvl,id] .= pt2index(vert[:, 4+n,lvl,id], i, j, k, mesh)
+        pt2index!(@view(vert_ind[:, 4+n, 1,lvl,id]), @view(vert[:, 4+n,lvl,id]), i, j, k, mesh)
         # Enforce boundedness
         for p=1:3
             vert_ind[p, 4+n, 1,lvl,id] = max(vert_ind[p, 4+n, 1,lvl,id], min(vert_ind[p, v1, 1,lvl,id], vert_ind[p, v2, 1,lvl,id]))

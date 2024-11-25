@@ -3,29 +3,34 @@ Example using inflow/outflow
 """
 
 using Mist
+using Random
 
+#Domain set up similar to "Numerical simulation of a single rising bubble by VOF with surface compression"
 # Define parameters 
 param = parameters(
     # Constants
-    mu_liq=10.0,       # Dynamic viscosity
-    mu_gas=10.0,       # Dynamic viscosity
-    rho_liq=1.0,           # Density
-    rho_gas=1.0,           # Density
-    sigma = 0.0,
-    gravity = 0.0,
-    Lx=3.0,            # Domain size
-    Ly=3.0,
-    Lz=3.0,
-    tFinal=1.0,      # Simulation time
+    mu_liq=1.25,       # Dynamic viscosity of liquid (N/m)
+    mu_gas = 1.79e-5, # Dynamic viscosity of gas (N/m)
+    rho_liq= 1340,           # Density of liquid (kg/m^3)
+    rho_gas =1.225,  # Density of gas (kg/m^3)
+    sigma = 0.0769, # surface tension coefficient (Ns/m^2)
+    gravity = 9.8, # Gravity (m/s^2)
+    Lx=0.21,            # Domain size of 8Dx30Dx8D where D is bubble diameter(cm)
+    Ly=0.21, #0.63,             
+    Lz=0.21,
+    tFinal=100.0,      # Simulation time
+ 
     
     # Discretization inputs
-    Nx=10,           # Number of grid cells
-    Ny=10,
-    Nz=1,
-    stepMax=15,   # Maximum number of timesteps
-    CFL=0.01,         # Courant-Friedrichs-Lewy (CFL) condition for timestep
+    Nx=21,           # Number of grid cells
+    Ny=21, # 63,
+    Nz=21,
+    stepMax=1000,   # Maximum number of timesteps
+    max_dt = 1e-3,
+    CFL=0.4,         # Courant-Friedrichs-Lewy (CFL) condition for timestep
+    std_out_period = 0.0,
     out_period=1,     # Number of steps between when plots are updated
-    tol = 1e-3,
+    tol = 1e-4,
 
     # Processors 
     nprocx = 1,
@@ -35,24 +40,32 @@ param = parameters(
     # Periodicity
     xper = false,
     yper = false,
-    zper = true,
+    zper = false,
 
-    # pressure_scheme = "semi-lagrangian",
-    # pressureSolver = "hypreSecant",
+    # Restart  
+    restart = false,
+    restart_itr = 56,
+
+    pressure_scheme = "semi-lagrangian",
+    pressureSolver = "hypreSecant",
     
-    pressureSolver = "FC_hypre",
-    pressure_scheme = "finite-difference",
+    # pressureSolver = "FC_hypre",
+    # pressure_scheme = "finite-difference",
     
     iter_type = "standard",
+    VTK_dir= "VTK_viscous_bubble_FD_31x110x31_flux_corrected"
+
 )
 
 """
 Initial conditions for pressure and velocity
 """
 function IC!(P,u,v,w,VF,mesh)
-    @unpack imin_,imax_,jmin_,jmax_,kmin_,kmax_,
-                xm,ym,zm,Lx,Ly,Lz = mesh
+    @unpack imino_,imaxo_,jmino_,jmaxo_,kmino_,kmaxo_,
+                imin_,imax_,jmin_,jmax_,kmin_,kmax_,
+                x,y,z,xm,ym,zm,Lx,Ly,Lz = mesh
     # Pressure
+    # rand!(P,1:10)
     fill!(P,0.0)
 
     # Velocity
@@ -62,8 +75,16 @@ function IC!(P,u,v,w,VF,mesh)
         w[i,j,k] = 0.0
     end
 
+    # fill!(VF,1.0)
     # Volume Fraction
-    fill!(VF,0.0)
+    rad=0.026
+    xo=0.105
+    yo=0.105
+    zo = 0.105
+    for k = kmino_:kmaxo_, j = jmino_:jmaxo_, i = imino_:imaxo_ 
+        VF[i,j,k]=VFbubble3d(x[i],x[i+1],y[j],y[j+1],z[k],z[k+1],rad,xo,yo,zo)
+        # VF[i,j,k]=VFbubble2d(x[i],x[i+1],y[j],y[j+1],rad,xo,yo)
+    end
 
     return nothing    
 end
@@ -80,30 +101,15 @@ function BC!(u,v,w,t,mesh,par_env)
      # Left 
      if irankx == 0 
         i = imin-1
-        for j=jmin_:jmax_
-            if ym[j] <= 1.5 
-                uleft = 1.0
-            else
-                uleft = 0.0
-            end
-            u[i,j,:] .= 2uleft .- u[imin,j,:]
-        end
-        v[i,:,:] = -v[imin,:,:] # No slip
+        u[i,:,:] = -u[imin,:,:] # No flux
+        v[i,:,:] = -v[imin,:,:] # slip
         w[i,:,:] = -w[imin,:,:] # No slip
     end
     # Right
-    vright=0.0
     if irankx == nprocx-1
         i = imax+1
-        for j=jmin_:jmax_
-            if ym[j] <= 1.5
-                uright = 1.0
-            else
-                uright = 0.0
-            end
-            u[i,j,:] .= 2uright .- u[imax,j,:]
-        end
-        v[i,:,:] = -v[imax,:,:] .+ 2vright # No slip
+        u[i,:,:] = -u[imax,:,:] # No flux
+        v[i,:,:] = -v[imax,:,:] # slip
         w[i,:,:] = -w[imax,:,:] # No slip
     end
     # Bottom 
@@ -114,31 +120,30 @@ function BC!(u,v,w,t,mesh,par_env)
         w[:,j,:] = -w[:,jmin,:] # No slip
     end
     # Top
-    utop=0.0
+    utop=1.0
     if iranky == nprocy-1
         j = jmax+1
-        u[:,j,:] = -u[:,jmax,:] .+ 2utop # No slip
-        v[:,j,:] = -v[:,jmax,:] # No flux
+        u[:,j,:] = -u[:,jmax,:]  # No slip
+        v[:,j,:] = -v[:,jmax,:]  # No flux
         w[:,j,:] = -w[:,jmax,:] # No slip
     end
     # Back 
     if irankz == 0 
         k = kmin-1
         u[:,:,k] = -u[:,:,kmin] # No slip
-        v[:,:,k] = -v[:,:,kmin] # No slip
+        v[:,:,k] = -v[:,:,kmin] # slip
         w[:,:,k] = -w[:,:,kmin] # No flux
     end
     # Front
     if irankz == nprocz-1
         k = kmax+1
         u[:,:,k] = -u[:,:,kmax] # No slip
-        v[:,:,k] = -v[:,:,kmax] # No slip
+        v[:,:,k] = -v[:,:,kmax] # slip
         w[:,:,k] = -w[:,:,kmax] # No flux
     end
 
     return nothing
 end
-
 
 """
 Apply outflow correction to region
@@ -146,9 +151,9 @@ Apply outflow correction to region
 function outflow_correction!(correction,uf,vf,wf,mesh,par_env)
     @unpack imin_,imax_,jmin_,jmax_,kmin_,kmax_ = mesh
     @unpack iranky,nprocy = par_env
-    # Right is the outflow
-    if irankx == nprocx-1
-        uf[imax_+1,:,:] .+= correction 
+    # Top is the outflow
+    if iranky == nprocy-1
+        vf[:,jmax_+1,:] .+= correction 
     end
 end
 
@@ -157,8 +162,8 @@ Define area of outflow region
 """
 function outflow_area(mesh,par_env)
     @unpack imin_,imax_,jmin_,jmax_,kmin_,kmax_ = mesh
-    @unpack x,y,z = mesh 
-    myArea = (y[jmax_+1]-y[jmin_]) * (z[kmax_+1]-z[kmin_])
+    @unpack x,z = mesh 
+    myArea = (x[imax_+1]-x[imin_]) * (z[kmax_+1]-z[kmin_])
     return NavierStokes_Parallel.parallel_sum_all(myArea,par_env)
 end
 outflow =(area=outflow_area,correction=outflow_correction!)
